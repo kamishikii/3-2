@@ -3,36 +3,38 @@ name: Build Android APK
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Позволяет запустить сборку вручную кнопкой в GitHub
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout репозитория
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Установка зависимостей Node.js
+      - name: Install dependencies
         run: npm install
 
-      - name: Setup Java (требуется для Android)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+      - name: Add Android platform
+        run: npx cap add android
 
-      - name: Сборка Android APK
-        run: npm run build:apk
+      - name: Sync web assets
+        run: npx cap sync android
 
-      - name: Загрузка APK в артефакты
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: my-world-app-debug
+          name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
