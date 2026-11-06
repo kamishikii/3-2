@@ -2,43 +2,393 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Мой мир</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Строитель мира PRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   
-  <!-- Подключаем A-Frame (движок, который делает всю магию) -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.1/dist/aframe-extras.min.js"></script>
+  
+  <style>
+    #ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 999;
+      background: rgba(0,0,0,0.85);
+      padding: 15px;
+      border-radius: 8px;
+      color: white;
+      font-family: Arial, sans-serif;
+      max-width: 250px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      margin: 3px 0;
+      padding: 8px;
+      background: #4CAF50;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn:hover { background: #45a049; }
+    .btn.danger { background: #f44336; }
+    .btn.info { background: #2196F3; }
+    .btn.warning { background: #ff9800; }
+    .section { margin: 12px 0; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; }
+    .section-title { font-weight: bold; margin-bottom: 8px; font-size: 14px; }
+    .hidden { display: none; }
+  </style>
 </head>
 <body>
   
-  <!-- Сама 3D сцена -->
+  <!-- UI меню -->
+  <div id="ui">
+    <div class="section">
+      <div class="section-title">🏗️ Построить:</div>
+      <button class="btn" onclick="spawnObject('house')">🏠 Дом</button>
+      <button class="btn" onclick="spawnObject('tree')">🌲 Дерево</button>
+      <button class="btn" onclick="spawnObject('rock')">🪨 Камень</button>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">🎯 Выделенный объект:</div>
+      <div id="selected-info" class="hidden">
+        <button class="btn info" onclick="moveSelected('forward')">⬆️ Вперёд</button>
+        <button class="btn info" onclick="moveSelected('back')">⬇️ Назад</button>
+        <button class="btn info" onclick="moveSelected('left')">⬅️ Влево</button>
+        <button class="btn info" onclick="moveSelected('right')">➡️ Вправо</button>
+        <button class="btn info" onclick="moveSelected('up')">🔼 Вверх</button>
+        <button class="btn info" onclick="moveSelected('down')">🔽 Вниз</button>
+        <button class="btn warning" onclick="rotateSelected()">🔄 Повернуть</button>
+        <button class="btn warning" onclick="scaleSelected('up')">🔍 Увеличить</button>
+        <button class="btn warning" onclick="scaleSelected('down')">🔍 Уменьшить</button>
+        <button class="btn danger" onclick="deleteSelected()">🗑️ Удалить</button>
+      </div>
+      <div id="no-selection">Кликни по объекту для выделения</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">🌍 Ландшафт:</div>
+      <button class="btn" onclick="changeTerrain('grass')">🌿 Трава</button>
+      <button class="btn" onclick="changeTerrain('sand')">🏖️ Песок</button>
+      <button class="btn" onclick="changeTerrain('stone')">🪨 Камень</button>
+      <button class="btn info" onclick="raiseTerrain()">⬆️ Поднять землю</button>
+      <button class="btn info" onclick="lowerTerrain()">⬇️ Опустить землю</button>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">💾 Сохранение:</div>
+      <button class="btn" onclick="saveWorld()">💾 Сохранить</button>
+      <button class="btn" onclick="downloadWorld()">📥 Скачать файл</button>
+      <button class="btn" onclick="document.getElementById('load-file').click()">📤 Загрузить файл</button>
+      <input type="file" id="load-file" accept=".json" style="display:none" onchange="loadWorld(event)">
+      <button class="btn danger" onclick="clearWorld()">🗑️ Очистить всё</button>
+    </div>
+  </div>
+  
   <a-scene>
     
-    <!-- Твоя модель мира -->
+    <!-- Основная модель мира -->
     <a-entity 
       id="world"
       gltf-model="world.glb"
-      position="0 0 0"
-      scale="1 1 1">
+      position="0 0 0">
     </a-entity>
     
-    <!-- Камера + управление для телефона -->
+    <!-- Земля -->
+    <a-plane 
+      id="terrain"
+      rotation="-90 0 0" 
+      width="100" 
+      height="100"
+      position="0 0 0"
+      material="src: url(textures/grass.jpg); repeat: 10 10">
+    </a-plane>
+    
+    <!-- Контейнер для построенных объектов -->
+    <a-entity id="built-objects"></a-entity>
+    
+    <!-- Контейнер для ландшафтных блоков -->
+    <a-entity id="terrain-blocks"></a-entity>
+    
+    <!-- Игрок -->
     <a-entity 
       id="rig" 
-      position="0 1.6 3"
+      position="0 1.6 5"
       movement-controls="speed: 0.1; fly: true">
-      
       <a-entity 
+        id="camera"
         camera 
         look-controls="pointerLockEnabled: false"
         position="0 0 0">
       </a-entity>
     </a-entity>
     
-    <!-- Освещение (иначе будет темно) -->
+    <!-- Свет -->
     <a-light type="ambient" color="#fff" intensity="0.7"></a-light>
     <a-light type="directional" color="#fff" intensity="0.5" position="1 2 1"></a-light>
     
   </a-scene>
+
+  <script>
+    let objectCounter = 0;
+    let selectedObject = null;
+    
+    // Спавн объекта перед камерой
+    function spawnObject(type) {
+      const rig = document.querySelector('#rig');
+      const camera = document.querySelector('#camera');
+      const builtObjects = document.querySelector('#built-objects');
+      
+      const cameraPos = camera.getAttribute('position');
+      const rigPos = rig.getAttribute('position');
+      const cameraRot = camera.getAttribute('rotation');
+      
+      const radY = (cameraRot.y * Math.PI) / 180;
+      const offsetX = Math.sin(radY) * 3;
+      const offsetZ = -Math.cos(radY) * 3;
+      
+      const spawnPos = {
+        x: rigPos.x + offsetX,
+        y: 0,
+        z: rigPos.z + offsetZ
+      };
+      
+      const obj = document.createElement('a-entity');
+      obj.setAttribute('gltf-model', `models/${type}.glb`);
+      obj.setAttribute('position', spawnPos);
+      obj.setAttribute('rotation', '0 0 0');
+      obj.setAttribute('scale', '1 1 1');
+      obj.setAttribute('id', `built-${objectCounter++}`);
+      obj.classList.add('buildable');
+      
+      // Клик для выделения
+      obj.addEventListener('click', function() {
+        selectObject(this);
+      });
+      
+      builtObjects.appendChild(obj);
+      autoSave();
+    }
+    
+    // Выделение объекта
+    function selectObject(obj) {
+      if (selectedObject) {
+        selectedObject.removeAttribute('material');
+      }
+      
+      selectedObject = obj;
+      document.getElementById('selected-info').classList.remove('hidden');
+      document.getElementById('no-selection').classList.add('hidden');
+      
+      // Подсветка (красная обводка через материал)
+      obj.setAttribute('material', 'color: #ff0000; opacity: 0.8');
+    }
+    
+    // Движение выделенного объекта
+    function moveSelected(direction) {
+      if (!selectedObject) return;
+      
+      const pos = selectedObject.getAttribute('position');
+      const step = 0.5;
+      
+      switch(direction) {
+        case 'forward': pos.z -= step; break;
+        case 'back': pos.z += step; break;
+        case 'left': pos.x -= step; break;
+        case 'right': pos.x += step; break;
+        case 'up': pos.y += step; break;
+        case 'down': pos.y -= step; break;
+      }
+      
+      selectedObject.setAttribute('position', pos);
+      autoSave();
+    }
+    
+    // Поворот
+    function rotateSelected() {
+      if (!selectedObject) return;
+      const rot = selectedObject.getAttribute('rotation');
+      rot.y += 45;
+      selectedObject.setAttribute('rotation', rot);
+      autoSave();
+    }
+    
+    // Масштаб
+    function scaleSelected(dir) {
+      if (!selectedObject) return;
+      const scale = selectedObject.getAttribute('scale');
+      const factor = dir === 'up' ? 1.2 : 0.8;
+      scale.x *= factor;
+      scale.y *= factor;
+      scale.z *= factor;
+      selectedObject.setAttribute('scale', scale);
+      autoSave();
+    }
+    
+    // Удаление выделенного
+    function deleteSelected() {
+      if (!selectedObject) return;
+      selectedObject.remove();
+      selectedObject = null;
+      document.getElementById('selected-info').classList.add('hidden');
+      document.getElementById('no-selection').classList.remove('hidden');
+      autoSave();
+    }
+    
+    // Смена текстуры
+    function changeTerrain(texture) {
+      const terrain = document.querySelector('#terrain');
+      terrain.setAttribute('material', 'src', `url(textures/${texture}.jpg)`);
+      autoSave();
+    }
+    
+    // Поднять землю под камерой
+    function raiseTerrain() {
+      addTerrainBlock(0.5);
+    }
+    
+    // Опустить землю
+    function lowerTerrain() {
+      addTerrainBlock(-0.5);
+    }
+    
+    function addTerrainBlock(heightChange) {
+      const rig = document.querySelector('#rig');
+      const pos = rig.getAttribute('position');
+      
+      // Создаём куб под камерой
+      const block = document.createElement('a-box');
+      block.setAttribute('position', { x: Math.round(pos.x), y: heightChange / 2, z: Math.round(pos.z) });
+      block.setAttribute('width', 1);
+      block.setAttribute('height', Math.abs(heightChange));
+      block.setAttribute('depth', 1);
+      block.setAttribute('color', '#8B4513');
+      
+      document.querySelector('#terrain-blocks').appendChild(block);
+      autoSave();
+    }
+    
+    // Сохранение в localStorage
+    function autoSave() {
+      saveWorld();
+    }
+    
+    function saveWorld() {
+      const data = {
+        objects: [],
+        terrainBlocks: [],
+        terrainTexture: document.querySelector('#terrain').getAttribute('material').src
+      };
+      
+      // Сохраняем объекты
+      document.querySelectorAll('#built-objects a-entity').forEach(obj => {
+        data.objects.push({
+          model: obj.getAttribute('gltf-model'),
+          position: obj.getAttribute('position'),
+          rotation: obj.getAttribute('rotation'),
+          scale: obj.getAttribute('scale')
+        });
+      });
+      
+      // Сохраняем ландшафтные блоки
+      document.querySelectorAll('#terrain-blocks a-box').forEach(block => {
+        data.terrainBlocks.push({
+          position: block.getAttribute('position'),
+          height: block.getAttribute('height')
+        });
+      });
+      
+      localStorage.setItem('worldSave', JSON.stringify(data));
+      console.log('Сохранено!');
+    }
+    
+    // Загрузка при старте
+    function loadSavedWorld() {
+      const saved = localStorage.getItem('worldSave');
+      if (!saved) return;
+      
+      const data = JSON.parse(saved);
+      
+      // Восстанавливаем объекты
+      data.objects.forEach(objData => {
+        const obj = document.createElement('a-entity');
+        obj.setAttribute('gltf-model', objData.model);
+        obj.setAttribute('position', objData.position);
+        obj.setAttribute('rotation', objData.rotation);
+        obj.setAttribute('scale', objData.scale);
+        obj.classList.add('buildable');
+        obj.addEventListener('click', function() { selectObject(this); });
+        document.querySelector('#built-objects').appendChild(obj);
+      });
+      
+      // Восстанавливаем ландшафт
+      data.terrainBlocks.forEach(blockData => {
+        const block = document.createElement('a-box');
+        block.setAttribute('position', blockData.position);
+        block.setAttribute('height', blockData.height);
+        block.setAttribute('width', 1);
+        block.setAttribute('depth', 1);
+        block.setAttribute('color', '#8B4513');
+        document.querySelector('#terrain-blocks').appendChild(block);
+      });
+      
+      // Восстанавливаем текстуру
+      if (data.terrainTexture) {
+        document.querySelector('#terrain').setAttribute('material', 'src', data.terrainTexture);
+      }
+    }
+    
+    // Скачать файл
+    function downloadWorld() {
+      const saved = localStorage.getItem('worldSave');
+      if (!saved) {
+        alert('Нечего сохранять!');
+        return;
+      }
+      
+      const blob = new Blob([saved], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'world-save.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    // Загрузить файл
+    function loadWorld(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        localStorage.setItem('worldSave', e.target.result);
+        location.reload(); // Перезагружаем страницу чтобы подхватить
+      };
+      reader.readAsText(file);
+    }
+    
+    // Очистить всё
+    function clearWorld() {
+      if (!confirm('Точно удалить всё построенное?')) return;
+      
+      document.querySelector('#built-objects').innerHTML = '';
+      document.querySelector('#terrain-blocks').innerHTML = '';
+      localStorage.removeItem('worldSave');
+      selectedObject = null;
+      document.getElementById('selected-info').classList.add('hidden');
+      document.getElementById('no-selection').classList.remove('hidden');
+    }
+    
+    // Загрузка сохранённого мира при старте
+    window.addEventListener('load', loadSavedWorld);
+  </script>
 
 </body>
 </html>
