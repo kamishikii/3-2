@@ -2,5 +2,4 @@
   "appId": "com.world.builder",
   "appName": "MyWorld",
   "webDir": ".",
-  "bundledWebRuntime": false
 }
