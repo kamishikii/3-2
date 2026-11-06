@@ -1,31 +1,58 @@
-name: Build Android APK
+name: Build APK
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
 
-      - name: Install dependencies
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Dependencies
         run: npm install
 
-      - name: Add Android platform
+      - name: Prepare WWW
+        run: |
+          rm -rf www
+          mkdir -p www
+          cp index.html www/
+          cp -r css js www/
+
+      - name: Clean Android
+        run: rm -rf android
+
+      - name: Add Android
         run: npx cap add android
 
-      - name: Sync web assets
-        run: npx cap sync android
+      - name: Create Signing Key
+        run: |
+          mkdir -p signing
+          if [ ! -f signing/my-key.jks ]; then
+            keytool -genkeypair -v -keystore signing/my-key.jks -alias mykey -keyalg RSA -keysize 2048 -validity 10000 -storepass 12345678 -keypass 12345678 -dname "CN=MyMusic, OU=Me, O=Me, C=RU"
+          fi
+
+      - name: Patch build.gradle
+        run: |
+          cd android/app
+          sed -i '/android {/a\    signingConfigs {\n        mykey {\n            storeFile file("../../signing/my-key.jks")\n            storePassword "12345678"\n            keyAlias "mykey"\n            keyPassword "12345678"\n        }\n    }' build.gradle
+          sed -i '/buildTypes {/a\        debug {\n            signingConfig signingConfigs.mykey\n        }' build.gradle
 
       - name: Build APK
         run: |
@@ -33,8 +60,18 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Commit APK and Key
+        run: |
+          mkdir -p apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk/app-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apk/app-debug.apk signing/my-key.jks
+          git commit -m "Update APK and signing key" || echo "No changes"
+          git push
