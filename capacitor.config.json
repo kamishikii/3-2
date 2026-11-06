@@ -1,5 +1,9 @@
 {
-  "appId": "com.world.builder",
+  "appId": "com.myworld.app",
   "appName": "MyWorld",
-  "webDir": "www",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
 }
