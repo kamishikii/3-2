@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:
+  workflow_dispatch: # Позволяет запускать сборку вручную из вкладки Actions
 
 jobs:
   build:
@@ -17,6 +17,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm' # Добавлено: кэширование npm для ускорения последующих сборок
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -25,13 +26,20 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        # ИСПРАВЛЕНИЕ: версия обновлена с v3 на v4. 
+        # v3 пытался скачать удаленный Google пакет "tools", v4 использует актуальные "cmdline-tools"
+        uses: android-actions/setup-android@v4
+
+      - name: Accept Android SDK licenses
+        # Добавлено: автоматическое принятие лицензий Android SDK, чтобы избежать неожиданных ошибок сборки
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Install npm dependencies
         run: npm install
 
       - name: Add Android platform
-        run: npx cap add android || echo "already exists"
+        # Создает папку android, если её еще нет (игнорирует ошибку, если она уже существует)
+        run: npx cap add android || echo "Android platform already exists"
 
       - name: Sync web assets
         run: npx cap sync android
@@ -47,4 +55,5 @@ jobs:
         with:
           name: my-world-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30 # Добавлено: файл будет храниться 30 дней (по умолчанию 90)
           if-no-files-found: error
