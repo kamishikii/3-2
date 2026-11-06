@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Мой мир</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- Подключаем A-Frame (движок, который делает всю магию) -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+</head>
+<body>
+  
+  <!-- Сама 3D сцена -->
+  <a-scene>
+    
+    <!-- Твоя модель мира -->
+    <a-entity 
+      id="world"
+      gltf-model="world.glb"
+      position="0 0 0"
+      scale="1 1 1">
+    </a-entity>
+    
+    <!-- Камера + управление для телефона -->
+    <a-entity 
+      id="rig" 
+      position="0 1.6 3"
+      movement-controls="speed: 0.1; fly: true">
+      
+      <a-entity 
+        camera 
+        look-controls="pointerLockEnabled: false"
+        position="0 0 0">
+      </a-entity>
+    </a-entity>
+    
+    <!-- Освещение (иначе будет темно) -->
+    <a-light type="ambient" color="#fff" intensity="0.7"></a-light>
+    <a-light type="directional" color="#fff" intensity="0.5" position="1 2 1"></a-light>
+    
+  </a-scene>
+
+</body>
+</html>
