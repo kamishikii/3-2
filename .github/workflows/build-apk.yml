@@ -1,77 +1,47 @@
-name: Build APK
+name: Build Android APK
 
 on:
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
+          distribution: 'zulu'
+          java-version: '17'
 
-      - name: Install Dependencies
+      - name: Install npm dependencies
         run: npm install
 
-      - name: Prepare WWW
-        run: |
-          rm -rf www
-          mkdir -p www
-          cp index.html www/
-          cp -r css js www/
+      - name: Add Android platform (ignore if exists)
+        run: npx cap add android || echo "Android platform already exists"
 
-      - name: Clean Android
-        run: rm -rf android
+      - name: Sync web assets to Android
+        run: npx cap sync android
 
-      - name: Add Android
-        run: npx cap add android
-
-      - name: Create Signing Key
-        run: |
-          mkdir -p signing
-          if [ ! -f signing/my-key.jks ]; then
-            keytool -genkeypair -v -keystore signing/my-key.jks -alias mykey -keyalg RSA -keysize 2048 -validity 10000 -storepass 12345678 -keypass 12345678 -dname "CN=MyMusic, OU=Me, O=Me, C=RU"
-          fi
-
-      - name: Patch build.gradle
-        run: |
-          cd android/app
-          sed -i '/android {/a\    signingConfigs {\n        mykey {\n            storeFile file("../../signing/my-key.jks")\n            storePassword "12345678"\n            keyAlias "mykey"\n            keyPassword "12345678"\n        }\n    }' build.gradle
-          sed -i '/buildTypes {/a\        debug {\n            signingConfig signingConfigs.mykey\n        }' build.gradle
-
-      - name: Build APK
+      - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK Artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: my-world-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Commit APK and Key
-        run: |
-          mkdir -p apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk apk/app-debug.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apk/app-debug.apk signing/my-key.jks
-          git commit -m "Update APK and signing key" || echo "No changes"
-          git push
+          if-no-files-found: error
