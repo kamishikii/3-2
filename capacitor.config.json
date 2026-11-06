@@ -1,0 +1,12 @@
+{
+  "appId": "com.myworld.builder",
+  "appName": "My 3D World",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "android": {
+    "buildOptions": {
+      "keystorePath": null,
+      "keystoreAlias": null
+    }
+  }
+}
