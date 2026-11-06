@@ -1,5 +1,5 @@
 {
   "appId": "com.world.builder",
   "appName": "MyWorld",
-  "webDir": ".",
+  "webDir": "www",
 }
